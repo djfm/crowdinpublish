@@ -154,7 +154,7 @@ class PSVersion
 		if (!preg_match('/\d+(?:\.\d+)*$/', $version_number))
 			return array(
 				'success' => false,
-				'message' => 'Invalid version number. Must look  link x.x.x.x where the x\'s are integers.'
+				'message' => 'Invalid version number. Must look  like x.x.x.x where the x\'s are integers.'
 			);
 
 		$new_entity = !empty($data['new_entity']);
@@ -234,6 +234,10 @@ class PSVersion
 			$got = static::setupGIT($shop_dir);
 			if (!$got['success'])
 				return $got;
+
+			$setup = static::setupDirectory($target);
+			if (!$setup['success'])
+				return $setup;
 		}
 		else if ($new_entity)
 		{
@@ -329,6 +333,30 @@ class PSVersion
 		if (is_dir($version_folder))
 			if (!File::deleteDirectory($version_folder))
 				return array('success' => false, sprintf('Could not delete the `%s` directory.', $version_folder));
+
+		return array('success' => true);
+	}
+
+	public static function setupDirectory($dir)
+	{
+		foreach (array('archive', 'packs') as $folder)
+		{
+			$path = $dir.'/'.$folder;
+			if (!is_dir($path))
+				if (!@mkdir($path, 0777))
+					return array(
+						'success' => false,
+						'message' => sprintf('Could not create directory `%s`.', $path)
+					);
+		}
+
+		$cwd = getcwd();
+
+		chdir($dir);
+		$unsued = array();
+		$status = null;
+		@exec('chmod 777 -R .', $unused, $status);
+		chdir($cwd);
 
 		return array('success' => true);
 	}
