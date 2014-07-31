@@ -15,13 +15,17 @@ app.directive('djfmFileInput', function() {
 	};
 });
 
-app.directive('djfmConfirmClick', function() {
+app.directive('djfmSafeClick', function() {
 	return {
 		restrict: 'A',
 		link: function(scope, element, attrs) {
 			angular.element(element).on('click', function(event) {
-				if (!confirm(attrs.djfmConfirmClick || 'Are you sure you want to proceed with this dangerous action?'))
+				if (!confirm(attrs.dataConfirm || 'Are you sure you want to proceed with this dangerous action?')) {
 					event.preventDefault();
+					return false;
+				} else {
+					scope.$eval(attrs.djfmSafeClick);
+				}
 			});
 		}
 	};

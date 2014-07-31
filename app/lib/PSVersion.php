@@ -2,6 +2,42 @@
 
 class PSVersion
 {
+	public static function lock($version_number, callable $cb)
+	{
+		$lock_path = storage_path() . '/tmp/' . $version_number . '.lock';
+
+		if (!is_dir(basename($lock_path)) && !@mkdir(basename($lock_path), 0777))
+			return array(
+				'success' => false,
+				'message' => sprintf('Could not create dir `%s`.', basename($lock_path))
+			);
+
+		$h = fopen($lock_path, 'w');
+
+		if (!$h)
+			return array(
+				'success' => false,
+				'message' => sprintf('Could not create lock file `%s`.', $lock_path)
+			);
+
+		if (flock($h, LOCK_EX | LOCK_NB))
+		{
+			$result = call_user_func($cb);
+			flock($h, LOCK_UN);
+			fclose($h);
+			return $result;
+		}
+		else
+			return array(
+				'success' => false,
+				'message' => sprintf(
+					'Could not acquire lock on `%s`. If this persists, maybe the file needs to be removed manually.',
+					$lock_path
+				)
+			);
+		
+	}
+
 	public static function getConfig()
 	{
 		$config_path = Config::get('crowdinpublish.crowdinator_path') . '/config.json';

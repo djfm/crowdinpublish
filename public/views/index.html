@@ -1,6 +1,6 @@
 <section>
 	<h2>Versions Currently Known</h2>
-	<p>Below are all the PrestaShop versions that are currently being published.</p>
+	<p>Below are all the PrestaShop versions that are currently in the publication cycle.</p>
 	<table class="table">
 		<tbody>
 			<tr ng-repeat="version in versions">
@@ -18,5 +18,33 @@
 <section>
 	<h2>Add a New Version</h2>
 	<p>Use the form below to add a new version (e.g. after a release) to the publication cycle.</p>
+	<div class="djfm-help">
+		You will need 3 things for this.
+		<br>
+		<dl>
+			<dt>A Version Number</dt>
+			<dd>
+				This is the PrestaShop version number, like 1.6.0.10, 1.6.1.0, etc.<br>
+				The version number must be the one that is displayed in the backoffice of the prestashop version you are adding.<br>
+				<div class="alert alert-warning">
+					<strong>Important:</strong> This version number must <strong>NOT</strong> already be in use on Crowdin.<br>
+					E.g., if you're adding a development version, check that the version number was changed. If it is the same as that of a stable version, <strong>abort</strong>.
+				</div>
+			</dd>
+			<dt>A Version Header</dt>
+			<dd>
+				This is the integer id that identifies a version on translate.prestashop.com. They can be found under "PS Versions" on translate.prestashop.com.<br>
+				To get a version header for a new version, you need to first add the version on translate.prestashop.com.<br>
+				You need to add a version using the so called "by hand method", see the form on translate.prestashop.com.
+			</dd>
+			<dt>A ZIP Archive</dt>
+			<dd>
+				This is just a ZIP of PrestaShop. The PrestaShop inside must be in a folder called "prestashop".<br>
+				It must have the admin and install folders named in a standard way: either admin or admin-dev, either install or install-dev.<br>
+				When publishing a development version of PrestaShop, you need to zip the folder with git initialized, with everything set to track the branches you intend to use.<br>
+				E.g.: prestashop on branch "release", all submodules on branch "master"
+			</dd>
+		</dl>
+	</div>
 	<div ng-include="'views/version_form.html'" ng-controller="NewEditVersionCtrl"></div>
 </section>

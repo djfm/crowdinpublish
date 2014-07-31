@@ -32,9 +32,18 @@ Route::post('/versions/{version_number}', function($version_number) {
 		$data['archive'] = Input::file('archive');
 	}
 
-	return Response::json(PSVersion::createOrUpdateVersion($version_number, $data));
+	$output = PSVersion::lock($version_number, function() use ($version_number, $data) {
+		return PSVersion::createOrUpdateVersion($version_number, $data);
+	});
+
+	return Response::json($output);
 });
 
 Route::post('/versions/{version_number}/delete', function($version_number) {
-	return Response::json(PSVersion::deleteVersion($version_number));
+	
+	$output = PSVersion::lock($version_number, function() use ($version_number) {
+		return PSVersion::deleteVersion($version_number);
+	});
+
+	return Response::json($output);
 });
