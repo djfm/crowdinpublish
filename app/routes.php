@@ -34,3 +34,7 @@ Route::post('/versions/{version_number}', function($version_number) {
 
 	return Response::json(PSVersion::createOrUpdateVersion($version_number, $data));
 });
+
+Route::post('/versions/{version_number}/delete', function($version_number) {
+	return Response::json(PSVersion::deleteVersion($version_number));
+});

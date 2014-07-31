@@ -11,3 +11,8 @@ h1 a {
 h1 a:hover {
 	text-decoration: none;
 }
+
+.take-space-when-hidden.ng-hide {
+	display: inherit !important;
+	visibility: hidden;
+}

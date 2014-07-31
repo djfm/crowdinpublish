@@ -16,6 +16,17 @@ class PSVersion
 		return array('success' => true, 'data' => $config);
 	}
 
+	public static function writeConfig($config)
+	{
+		$config_path = Config::get('crowdinpublish.crowdinator_path') . '/config.json';
+		if (!@file_put_contents($config_path, json_encode($config, JSON_PRETTY_PRINT), LOCK_EX))
+		{
+			return array('success' => false, 'message' => sprintf('Could not write config to `%s`.', $config_path));
+		}
+
+		return array('success' => true);
+	}
+
 	public static function updateGlobalConfigForVersion($version_number)
 	{
 		$config = static::getConfig();
@@ -35,13 +46,7 @@ class PSVersion
 			);
 		}
 
-		$config_path = Config::get('crowdinpublish.crowdinator_path') . '/config.json';
-		if (!@file_put_contents($config_path, json_encode($config, JSON_PRETTY_PRINT), LOCK_EX))
-		{
-			return array('success' => false, 'message' => sprintf('Could not write config to `%s`.', $config_path));
-		}
-
-		return array('success' => true);
+		return static::writeConfig($config);
 	}
 
 	public static function getVersionConfig($version_number)
@@ -62,10 +67,14 @@ class PSVersion
 	{
 		$config_path = Config::get('crowdinpublish.crowdinator_path') . '/versions/' . $version_number . '/config.json';
 		if (!is_dir(dirname($config_path)))
-			if (!@mkdir($config_path, 0777, true))
+			if (!@mkdir(dirname($config_path), 0777, true))
 				return array('success' => false, 'message' => sprintf('Could not create directory `%s`.', dirname($config_path)));
 
-		file_put_contents($config_path, json_encode($conf, JSON_PRETTY_PRINT), LOCK_EX);
+		if (!@file_put_contents($config_path, json_encode($conf, JSON_PRETTY_PRINT), LOCK_EX))
+			return array(
+				'success' => false,
+				'message' => sprintf('Can\'t write to `%s`.', $config_path)
+			);
 
 		return array('success' => true);
 	}
@@ -106,9 +115,13 @@ class PSVersion
 
 	public static function createOrUpdateVersion($version_number, $data)
 	{
-		$glob = static::updateGlobalConfigForVersion($version_number);
-		if (!$glob['success'])
-			return $glob;
+		if (!preg_match('/\d+(?:\.\d+)*$/', $version_number))
+			return array(
+				'success' => false,
+				'message' => 'Invalid version number. Must look  link x.x.x.x where the x\'s are integers.'
+			);
+
+		$new_entity = !empty($data['new_entity']);
 
 		if (isset($data['archive']))
 		{
@@ -140,7 +153,16 @@ class PSVersion
 					$to_extract[] = $entry;
 			}
 
-			$target = realpath(Config::get('crowdinpublish.crowdinator_path').'/versions/'.$version_number);
+			$target = Config::get('crowdinpublish.crowdinator_path').'/versions/'.$version_number;
+
+			if (!is_dir($target) && $new_entity)
+				if (!@mkdir($target, 0777))
+					return array(
+						'success' => false,
+						'message' => sprintf('Could not create directory `%s`', $target)
+					);
+
+			$target = realpath($target);
 
 			if (!$target)
 				return array('success' => false, 'message' => 'Could not find the version folder. This is not your fault.');
@@ -173,33 +195,49 @@ class PSVersion
 			if (!$renamed['success'])
 				return $renamed;
 
-			$got = static::initEmptyGitRepoIfNeeded($shop_dir);
+			$got = static::setupGIT($shop_dir);
 			if (!$got['success'])
 				return $got;
+		}
+		else if ($new_entity)
+		{
+			return array('success' => false, 'message' => 'A ZIP Archive is required when adding a new version.');
+		}
 
-			if (isset($data['version_header']))
+		if (isset($data['version_header']))
+		{
+			if (!is_numeric($data['version_header']) || (int)$data['version_header'] != $data['version_header'])
 			{
-				if (!is_numeric($data['version_header']) || (int)$data['version_header'] != $data['version_header'])
-				{
-					return array('success' => false, 'message' => 'Version Header doesn\'t look like an integer.');
-				}
+				return array('success' => false, 'message' => 'Version Header doesn\'t look like an integer.');
+			}
 
+			if ($new_entity)
+			{
+				$conf = array();
+			}
+			else
+			{
 				$conf = static::getVersionConfig($version_number);
 				if (!$conf['success'])
 					return $conf;
-
 				$conf = $conf['data'];
-				$conf['version_header'] = $data['version_header'];
-
-				$wrote = static::writeVersionConfig($version_number, $conf);
-				if (!$wrote['success'])
-					return $wrote;
 			}
 
-			return array('success' => true);
+			$conf['version_header'] = $data['version_header'];
+
+			$wrote = static::writeVersionConfig($version_number, $conf);
+			if (!$wrote['success'])
+				return $wrote;
 		}
 
-		return;
+		if ($new_entity)
+		{
+			$glob = static::updateGlobalConfigForVersion($version_number);
+			if (!$glob['success'])
+				return $glob;
+		}
+
+		return array('success' => true);
 	}
 
 	public static function renameAdminAndInstall($dir)
@@ -217,7 +255,7 @@ class PSVersion
 		return array('success' => true);
 	}
 
-	public static function initEmptyGitRepoIfNeeded($dir)
+	public static function setupGIT($dir)
 	{
 		if (!is_dir($dir.'/.git'))
 		{
@@ -230,6 +268,31 @@ class PSVersion
 			if ($ret !== 0)
 				return array('success' => false, sprintf('Could not initialize git in directory `%s`.', $dir));
 		}
+
+		chdir($dir);
+		// to prevent pull from failing because of permissions
+		@exec('git config core.filemode false');
+		chdir($cwd);
+
+		return array('success' => true);
+	}
+
+	public static function deleteVersion($version_number)
+	{
+		$conf = static::getConfig();
+		if (!$conf['success'])
+			return $conf;
+
+		$conf = $conf['data'];
+		if (isset($conf['versions'][$version_number]))
+			unset($conf['versions'][$version_number]);
+
+		$wrote = static::writeConfig($conf);
+
+		$version_folder = realpath(Config::get('crowdinpublish.crowdinator_path').'/versions/'.$version_number);
+		if (is_dir($version_folder))
+			if (!File::deleteDirectory($version_folder))
+				return array('success' => false, sprintf('Could not delete the `%s` directory.', $version_folder));
 
 		return array('success' => true);
 	}
